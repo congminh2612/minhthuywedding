@@ -1,7 +1,6 @@
 import { useState } from "react";
 import IntroScreen from "./components/IntroScreen";
 import ScrollProgress from "./components/ScrollProgress";
-import NavDots from "./components/NavDots";
 import RosePetals from "./components/RosePetals";
 import AudioPlayer from "./components/AudioPlayer";
 import HeroSection from "./components/HeroSection";
@@ -23,7 +22,6 @@ function App() {
       {entered && (
         <>
           <ScrollProgress />
-          <NavDots />
           <RosePetals />
           <AudioPlayer />
           <HeroSection />

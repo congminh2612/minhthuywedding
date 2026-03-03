@@ -166,44 +166,6 @@ export default function GallerySection() {
             </motion.div>
           )
         })}
-
-        {/* Nút prev / next */}
-        <button
-          onClick={prev}
-          className="absolute left-4 md:left-8 z-20 w-10 h-10 rounded-full border border-white/20 bg-white/10 backdrop-blur-sm flex items-center justify-center text-white/70 hover:bg-white/20 hover:text-white transition-all"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <button
-          onClick={next}
-          className="absolute right-4 md:right-8 z-20 w-10 h-10 rounded-full border border-white/20 bg-white/10 backdrop-blur-sm flex items-center justify-center text-white/70 hover:bg-white/20 hover:text-white transition-all"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Dot indicators */}
-      <div className="flex justify-center gap-2 mt-10">
-        {photos.map((_, i) => (
-          <button
-            key={i}
-            onClick={() => setActive(i)}
-            className="transition-all duration-400"
-          >
-            <motion.div
-              animate={{
-                width:           i === active ? 24 : 6,
-                backgroundColor: i === active ? '#C9A055' : 'rgba(255,255,255,0.25)',
-              }}
-              transition={{ duration: 0.35 }}
-              className="h-[5px] rounded-full"
-            />
-          </button>
-        ))}
       </div>
 
     </section>
