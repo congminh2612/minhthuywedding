@@ -1,0 +1,62 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&family=Great+Vibes&family=Inter:wght@300;400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-cream:    #FDF6EE;
+  --color-ivory:    #F3E8D7;
+  --color-blush:    #EDCDD4;
+  --color-rose:     #C4677B;
+  --color-burgundy: #7B2436;
+  --color-wine:     #140810;
+  --color-gold:     #C9A055;
+  --color-charcoal: #2C2C2C;
+
+  --font-serif:  'Cormorant Garamond', Georgia, serif;
+  --font-script: 'Great Vibes', cursive;
+  --font-sans:   'Inter', system-ui, sans-serif;
+
+  /* Safe area insets cho iOS notch / home indicator */
+  --sat: env(safe-area-inset-top,    0px);
+  --sar: env(safe-area-inset-right,  0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left,   0px);
+}
+
+html {
+  /* Smooth scroll toàn trang, iOS cần -webkit */
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background-color: #FDF6EE;
+  color: #2C2C2C;
+  /* Ngăn overscroll bounce ảnh hưởng layout trên iOS */
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+  /* Smooth momentum scroll trên iOS Safari */
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Tất cả button và a cần tap target tối thiểu 44px (Apple HIG) */
+button, a {
+  touch-action: manipulation;
+}
+
+/* Input / textarea phải có font-size >= 16px để tránh iOS auto-zoom */
+input, textarea, select {
+  font-size: 16px !important;
+}
+
+/* GPU layer cho canvas */
+canvas {
+  contain: strict;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
