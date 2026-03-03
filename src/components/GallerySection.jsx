@@ -81,7 +81,10 @@ export default function GallerySection() {
   }, [paused]);
 
   // ---------- core rAF loop ----------
-  const tick = useCallback((timestamp) => {
+  // Dùng ref để tránh stale closure khi tick tự gọi chính nó
+  const tickRef = useRef(null);
+  // eslint-disable-next-line react-hooks/refs
+  tickRef.current = (timestamp) => {
     if (lastTimeRef.current === null) lastTimeRef.current = timestamp;
 
     if (!pausedRef.current) {
@@ -98,14 +101,14 @@ export default function GallerySection() {
     }
 
     lastTimeRef.current = timestamp;
-    rafRef.current = requestAnimationFrame(tick);
-  }, []);
+    rafRef.current = requestAnimationFrame((ts) => tickRef.current(ts));
+  };
 
   // Khởi động / dọn dẹp loop
   useEffect(() => {
-    rafRef.current = requestAnimationFrame(tick);
+    rafRef.current = requestAnimationFrame((ts) => tickRef.current(ts));
     return () => cancelAnimationFrame(rafRef.current);
-  }, [tick]);
+  }, []);
 
   // ---------- Page Visibility API ----------
   // Khi tab bị ẩn: dừng tính thời gian; khi quay lại: reset lastTime để không bị nhảy
