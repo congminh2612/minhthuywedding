@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 
 const photos = [
   { src: "/images/gallery-1.jpg", caption: "Khoảnh khắc ngọt ngào" },
@@ -10,10 +10,12 @@ const photos = [
   { src: "/images/gallery-6.jpg", caption: "Lưu giữ từng khoảnh khắc" },
   { src: "/images/gallery-7.jpg", caption: "Tình yêu mãi xanh" },
   { src: "/images/gallery-8.jpg", caption: "Cùng nhau mãi mãi" },
+  { src: "/images/gallery-9.png", caption: "Cùng nhau mãi mãi" },
+  { src: "/images/gallery-10.png", caption: "Cùng nhau mãi mãi" },
 ];
 
 const TOTAL = photos.length;
-const INTERVAL = 3000; // ms mỗi slide
+const INTERVAL = 3000;
 
 function getOffset(index, active) {
   let off = index - active;
@@ -22,80 +24,57 @@ function getOffset(index, active) {
   return off;
 }
 
+// Precomputed — zero allocations inside render
+const SLIDE_STYLES = {
+  "-2": { opacity: 0.3, scale: 0.55, x: "-156%", zIndex: 2 },
+  "-1": { opacity: 0.6, scale: 0.72, x: "-65%", zIndex: 5 },
+  0: { opacity: 1, scale: 1.22, x: "0%", zIndex: 10 },
+  1: { opacity: 0.6, scale: 0.72, x: "65%", zIndex: 5 },
+  2: { opacity: 0.3, scale: 0.55, x: "156%", zIndex: 2 },
+};
 function slideStyle(off) {
-  const abs = Math.abs(off);
-  if (abs > 2)
-    return {
+  return (
+    SLIDE_STYLES[String(off)] ?? {
       opacity: 0,
       scale: 0.4,
       x: `${off * 95}%`,
       zIndex: 0,
-      pointerEvents: "none",
-    };
-  if (abs === 2)
-    return {
-      opacity: 0.3,
-      scale: 0.55,
-      x: `${off * 78}%`,
-      zIndex: 2,
-      pointerEvents: "none",
-    };
-  if (abs === 1)
-    return {
-      opacity: 0.6,
-      scale: 0.72,
-      x: `${off * 65}%`,
-      zIndex: 5,
-      pointerEvents: "auto",
-    };
-  return {
-    opacity: 1,
-    scale: 1.22,
-    x: "0%",
-    zIndex: 10,
-    pointerEvents: "auto",
-  };
+    }
+  );
 }
 
-const SLIDE_TRANSITION = {
-  type: "tween",
-  duration: 0.9,
-  ease: [0.25, 0.46, 0.45, 0.94],
-};
+const EASE = [0.25, 0.46, 0.45, 0.94];
+const SLIDE_TRANSITION = { type: "tween", duration: 0.9, ease: EASE };
+const INSTANT = { duration: 0 };
 
 export default function GallerySection() {
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
-  const [progress, setProgress] = useState(0); // 0–100
+  const prefersReducedMotion = useReducedMotion();
 
-  // Refs để tránh stale closure trong rAF loop
   const pausedRef = useRef(false);
-  const progressRef = useRef(0); // elapsed ms
-  const lastTimeRef = useRef(null); // timestamp of last rAF call
+  const progressRef = useRef(0);
+  const lastTimeRef = useRef(null);
   const rafRef = useRef(null);
   const dragStartRef = useRef(null);
 
-  // Đồng bộ state → ref
   useEffect(() => {
     pausedRef.current = paused;
   }, [paused]);
 
-  // ---------- core rAF loop ----------
-  // Dùng ref để tránh stale closure khi tick tự gọi chính nó
+  // ── rAF timer loop ────────────────────────────────────────────────────────
   const tickRef = useRef(null);
   // eslint-disable-next-line react-hooks/refs
   tickRef.current = (timestamp) => {
     if (lastTimeRef.current === null) lastTimeRef.current = timestamp;
 
     if (!pausedRef.current) {
-      const delta = timestamp - lastTimeRef.current;
+      // Cap delta to 200 ms — prevents large jump after tab switch / scroll
+      const delta = Math.min(timestamp - lastTimeRef.current, 200);
       progressRef.current += delta;
 
-      // Cập nhật thanh progress (0–100) mỗi frame
-      setProgress(Math.min((progressRef.current / INTERVAL) * 100, 100));
-
       if (progressRef.current >= INTERVAL) {
-        progressRef.current -= INTERVAL; // giữ phần dư, không reset về 0 → không nhảy
+        progressRef.current -= INTERVAL;
         setActive((a) => (a + 1) % TOTAL);
       }
     }
@@ -104,72 +83,70 @@ export default function GallerySection() {
     rafRef.current = requestAnimationFrame((ts) => tickRef.current(ts));
   };
 
-  // Khởi động / dọn dẹp loop
   useEffect(() => {
     rafRef.current = requestAnimationFrame((ts) => tickRef.current(ts));
     return () => cancelAnimationFrame(rafRef.current);
   }, []);
 
-  // ---------- Page Visibility API ----------
-  // Khi tab bị ẩn: dừng tính thời gian; khi quay lại: reset lastTime để không bị nhảy
+  // ── Page Visibility ───────────────────────────────────────────────────────
   useEffect(() => {
-    const onVisibilityChange = () => {
+    const onVis = () => {
       if (document.hidden) {
         pausedRef.current = true;
       } else {
-        lastTimeRef.current = null; // reset timestamp, tránh delta khổng lồ
+        lastTimeRef.current = null; // reset so delta doesn't spike
         if (!paused) pausedRef.current = false;
       }
     };
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    return () =>
-      document.removeEventListener("visibilitychange", onVisibilityChange);
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
   }, [paused]);
 
-  // ---------- helpers ----------
+  // ── helpers ───────────────────────────────────────────────────────────────
   const resetProgress = () => {
     progressRef.current = 0;
     lastTimeRef.current = null;
-    setProgress(0);
   };
 
   const prev = useCallback(() => {
     resetProgress();
     setActive((a) => (a - 1 + TOTAL) % TOTAL);
   }, []);
-
   const next = useCallback(() => {
     resetProgress();
     setActive((a) => (a + 1) % TOTAL);
   }, []);
-
   const goTo = useCallback((i) => {
     resetProgress();
     setActive(i);
   }, []);
 
-  // ---------- swipe ----------
-  const onTouchStart = (e) => {
+  // ── Touch / swipe ─────────────────────────────────────────────────────────
+  const onTouchStart = useCallback((e) => {
     dragStartRef.current = e.touches[0].clientX;
-  };
-  const onTouchEnd = (e) => {
-    if (dragStartRef.current === null) return;
-    const diff = dragStartRef.current - e.changedTouches[0].clientX;
-    if (diff > 40) next();
-    if (diff < -40) prev();
-    dragStartRef.current = null;
-  };
+  }, []);
 
-  // ---------- hover pause ----------
-  const handleMouseEnter = () => {
+  const onTouchEnd = useCallback(
+    (e) => {
+      if (dragStartRef.current === null) return;
+      const diff = dragStartRef.current - e.changedTouches[0].clientX;
+      if (diff > 40) next();
+      else if (diff < -40) prev();
+      dragStartRef.current = null;
+    },
+    [next, prev],
+  );
+
+  const handleMouseEnter = useCallback(() => {
     setPaused(true);
     pausedRef.current = true;
-  };
-  const handleMouseLeave = () => {
-    lastTimeRef.current = null; // tránh delta lớn sau khi hover lâu
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    lastTimeRef.current = null;
     setPaused(false);
     pausedRef.current = false;
-  };
+  }, []);
 
   return (
     <section
@@ -181,7 +158,7 @@ export default function GallerySection() {
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
-      {/* Header */}
+      {/* ── Header ── */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
@@ -201,27 +178,31 @@ export default function GallerySection() {
         <div className='mx-auto mt-4 h-px w-12 bg-gold/40' />
       </motion.div>
 
-      {/* Carousel */}
+      {/* ── Carousel ── */}
       <div
         className='relative flex items-center justify-center'
         style={{ height: "clamp(340px, 58vh, 640px)" }}
       >
         {photos.map((photo, i) => {
           const off = getOffset(i, active);
-          const style = slideStyle(off);
-
           if (Math.abs(off) > 2) return null;
+
+          const style = slideStyle(off);
+          const isActive = off === 0;
 
           return (
             <motion.div
               key={photo.src}
-              className='absolute cursor-pointer select-none'
+              className='absolute select-none'
               style={{
-                width: "clamp(200px, 30vw, 420px)",
-                height: "100%",
+                width: "clamp(250px, 30vw, 420px)",
+                height: "auto",
+                cursor: isActive ? "default" : "pointer",
+                // Promote each card to its own GPU layer so Compositor
+                // handles transform/opacity without touching the main thread
                 willChange: "transform, opacity",
                 backfaceVisibility: "hidden",
-                transform: "translateZ(0)",
+                WebkitBackfaceVisibility: "hidden",
               }}
               initial={false}
               animate={{
@@ -230,96 +211,55 @@ export default function GallerySection() {
                 opacity: style.opacity,
                 zIndex: style.zIndex,
               }}
-              transition={SLIDE_TRANSITION}
-              onClick={() => off !== 0 && goTo(i)}
+              transition={prefersReducedMotion ? INSTANT : SLIDE_TRANSITION}
+              onClick={() => !isActive && goTo(i)}
             >
-              <div className='relative w-full h-full overflow-hidden shadow-2xl rounded-lg'>
+              {/*
+               * translateZ(0) on the card creates a stacking context and
+               * ensures border-radius clipping doesn't force a repaint
+               * during the parent's scale animation on Safari/iOS.
+               */}
+              <div
+                className='relative w-full h-full overflow-hidden shadow-2xl rounded-lg'
+                style={{
+                  transform: "translateZ(0)",
+                  WebkitTransform: "translateZ(0)",
+                }}
+              >
                 <img
                   src={photo.src}
                   alt={photo.caption}
-                  loading={off === 0 ? "eager" : "lazy"}
+                  loading={Math.abs(off) <= 1 ? "eager" : "lazy"}
                   decoding='async'
-                  className='w-full h-full object-cover object-center'
+                  className='w-full h-full object-cover object-center block'
                   style={{
-                    filter: off === 0 ? "brightness(1)" : "brightness(0.65)",
+                    // filter is GPU-composited on modern browsers — safe to animate
+                    filter: isActive ? "brightness(1)" : "brightness(0.65)",
                     transition: "filter 0.6s ease-out",
+                    // Isolate img from layout so filter doesn't trigger repaint of parent
+                    willChange: "filter",
+                    pointerEvents: "none",
+                    userSelect: "none",
+                    WebkitUserSelect: "none",
+                    transform: "translateZ(0)",
                   }}
                   draggable={false}
                 />
 
-                <div className='absolute inset-0 bg-linear-to-t from-black/55 via-transparent to-transparent pointer-events-none' />
-
-                <AnimatePresence mode='wait'>
-                  {off === 0 && (
-                    <motion.div
-                      key='caption'
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -4 }}
-                      transition={{
-                        duration: 0.5,
-                        ease: [0.25, 0.46, 0.45, 0.94],
-                      }}
-                      className='absolute bottom-6 left-4 right-4 text-center'
-                    >
-                      <p
-                        className='text-white text-lg md:text-2xl font-light italic drop-shadow'
-                        style={{ fontFamily: "var(--font-serif)" }}
-                      >
-                        {photo.caption}
-                      </p>
-                      <div className='mx-auto mt-2 h-px w-10 bg-gold/70' />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {off === 0 && (
-                  <div
-                    className='absolute inset-0 border-2 border-gold/40 rounded-lg pointer-events-none'
-                    style={{ boxSizing: "border-box" }}
-                  />
-                )}
-              </div>
-            </motion.div>
-          );
-        })}
-      </div>
-
-      {/* Dot indicators + progress bar */}
-      <div className='flex items-center justify-center gap-3 mt-10'>
-        {photos.map((_, i) => {
-          const isActive = i === active;
-          return (
-            <button
-              key={i}
-              onClick={() => goTo(i)}
-              aria-label={`Slide ${i + 1}`}
-              className='relative flex items-center justify-center'
-              style={{ width: 28, height: 16 }}
-            >
-              {/* Track */}
-              <span
-                className='block rounded-full bg-white/20'
-                style={{
-                  width: isActive ? 28 : 6,
-                  height: 6,
-                  transition: "width 0.4s cubic-bezier(0.25,0.46,0.45,0.94)",
-                }}
-              />
-              {/* Progress fill — chỉ trên dot active */}
-              {isActive && (
-                <span
-                  className='absolute left-0 top-1/2 -translate-y-1/2 rounded-full bg-gold'
+                {/* Gold border */}
+                <div
+                  className='absolute inset-0 rounded-lg pointer-events-none'
                   style={{
-                    height: 6,
-                    width: `${progress}%`,
-                    maxWidth: "100%",
-                    // CSS transition ngắn hơn 1 frame (~16ms) để progress mượt
-                    transition: paused ? "none" : "width 80ms linear",
+                    border: "2px solid",
+                    borderColor: isActive
+                      ? "rgba(201,160,85,0.4)"
+                      : "transparent",
+                    transition: "border-color 0.5s ease",
+                    boxSizing: "border-box",
                   }}
                 />
-              )}
-            </button>
+              </div>
+            </motion.div>
           );
         })}
       </div>
