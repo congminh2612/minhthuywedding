@@ -5,7 +5,7 @@ const SLIDES = [
   { src: "/images/hero-1.png", pos: "center center" },
   { src: "/images/hero-2.png", pos: "center center" },
   { src: "/images/hero-3.png", pos: "center center" },
-  { src: "/images/hero-4.jpg", pos: "center 55%"    },
+  { src: "/images/hero-4.jpg", pos: "center 55%" },
 ];
 
 const INTERVAL = 5000; // ms mỗi slide
